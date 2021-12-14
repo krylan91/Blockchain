@@ -5,40 +5,71 @@ import me.aakrylov.blockchain.model.Block;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
+/**
+ * Class representing model of blockchain technology.
+ */
 public class Blockchain {
 
     private static final Logger logger = LoggerFactory.getLogger(Blockchain.class);
 
     private static final String LEADING_ZERO = "0";
-    private static final Long AVERAGE_CALCULATION_DURATION_MS = 10L;
 
+    private static Blockchain instance;
     private final List<Block> chain;
     private Integer complexityCoefficient = 1;
 
-    public Blockchain() {
+    private Blockchain() {
         this.chain = new ArrayList<>();
-        this.chain.add(new Block(LocalDateTime.now(), null));
+        this.chain.add(new Block(null));
     }
 
+    /**
+     * Singleton constructor.
+     *
+     * @return Instance of {@link Blockchain}
+     */
+    public static Blockchain getInstance() {
+        if (instance == null) {
+            instance = new Blockchain();
+        }
+        return instance;
+    }
+
+    /**
+     * Adding new block to blockchain.
+     * While adding new block it calculates its own hash and sets the hash of previous block into new block.
+     * <br>
+     * For emission purpose hash code must start with some number of leading zeros.
+     * <br>
+     * Complexity of calculation (i.e. number of leading zeros) increases every 100 blocks.
+     * <br>
+     * This process of calculation is in fact a proof-of-work because you must spend some time calculating the
+     * so called <b>nonce</b> value, which makes hash code start with leading zeros.
+     * While calculating you spend time but get some cryptocurrency. Or any other thing based on this blockchain.
+     * <br>
+     * Or nothing. This is just a sandbox, remember?
+     *
+     * @param block new block to add into blockchain.
+     */
     public void addBlock(Block block) {
         block.setPrevHash(this.getLastBlock().getHash());
-        long startTime = System.nanoTime();
         block.setHash(block.createHash());
         while (!block.getHash().startsWith(LEADING_ZERO.repeat(complexityCoefficient))) {
-            logger.trace("Block hash is {}, nonce is {}, mining...", block.getHash(), block.getNonce());
             int nonce = block.getNonce();
             nonce += 1;
             block.setNonce(nonce);
             block.setHash(block.createHash());
+            logger.trace("Block {}: Increasing nonce to {}", this.chain.size(), block.getNonce());
         }
-        logger.debug("Block hash is {}", block.getHash());
-        long endTime = System.nanoTime();
-        long hashCalculationTimeMs = (endTime - startTime) / 1000000;
-        if (hashCalculationTimeMs < AVERAGE_CALCULATION_DURATION_MS) {
+        logger.debug("Calculated block hash! {}", block.getHash());
+        if (this.chain.size() % 100 == 0) {
             increaseComplexity();
+            logger.trace("Increasing complexity to {}", complexityCoefficient);
         }
         this.chain.add(block);
     }
@@ -51,6 +82,14 @@ public class Blockchain {
         this.complexityCoefficient += 1;
     }
 
+    /**
+     * Checks if blockchain is valid or not.
+     * Nobody fucks with blockchain.
+     * <br>
+     * Ya know, what does that mean, do you?
+     *
+     * @return is blockchain valid or not
+     */
     public boolean isValid() {
         for (int i = 1; i < this.chain.size(); i++) {
             val currentBlock = this.chain.get(i);
@@ -64,7 +103,9 @@ public class Blockchain {
     }
 
     public void log() {
-        String msg = this.chain.toString();
+        String msg = this.chain.stream()
+                .map(Block::toString)
+                .collect(Collectors.joining(",\n"));
         logger.info(msg);
     }
 }
